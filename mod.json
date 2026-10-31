@@ -1,0 +1,16 @@
+{
+  "name": "PBZ Steady Camera / 影之刃零稳镜设置",
+  "version": "0.1.0-beta",
+  "pak_name": "zz_PBZCamera_P",
+  "game": {
+    "platform": "Windows x64 / Steam",
+    "steam_build": "26266538",
+    "game_cl": "301524_JKS-17219",
+    "unreal_engine": "5.7.4",
+    "exe_sha256": "7b4fcd286a350780faf0824d73aa150b21cbf1bccde883e6a96386cbe09973b4"
+  },
+  "original_scripts": {
+    "UI/Widget/SystemBase.js": "ee19d29be91d51bf5a7222b1e894d027cfbfd848bd00f176642674cdeafb0b1c",
+    "Gameplay/GameModeBuild.js": "16d7c48d469562bd6c0037f45843eff80f91bbe3e345c8eb83d5ea44454f65eb"
+  }
+}

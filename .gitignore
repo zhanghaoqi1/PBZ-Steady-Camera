@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+out/
+build*/
+.env*
+*.log
+*.pak
+*.utoc
+*.ucas
+*.exe
+*.dll
+PBZCamera.json
+PBZCamera-diagnostics.txt
