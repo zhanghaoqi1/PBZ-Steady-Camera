@@ -1,3 +1,11 @@
+# v0.1.3-beta — 2026-11-02
+
+- Fixes "restore original" (or any parameter returning to its native value) appearing to do nothing until a slider was moved again.
+- Root cause: distance and X/Y framing are native additive overrides, and a paused camera component does not tick, so removing an override did not recompute the paused image.
+- A pause-time rollback now writes the zero value first (distance 0, socket offset `(0,0,0)`, blend 0) so the background returns immediately; the override entry itself is removed on the next unpaused poll, with delta bookkeeping that prevents duplicate writes.
+- Verified in game: distance, FOV, shake and X/Y offset all return to the original look on Apply after "restore original", including repeatedly.
+- 42 camera behavior tests and 4 release tests pass.
+
 # v0.1.2-beta — 2026-11-02
 
 - Adds signed camera framing offsets: horizontal X and vertical Y, each **-300 to +300 cm** in 5 cm steps, default 0.

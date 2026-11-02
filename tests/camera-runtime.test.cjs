@@ -47,13 +47,17 @@ test('framing uses one owned additive local Y/Z vector, preserves zero forward o
     s.api.stop(s.world);assert.ok(s.removed.includes('PBZCamera.Framing'));
 });
 
-test('paused Apply previews signed framing and zero removes only the owned additive entry',()=>{
+test('paused Apply previews signed framing and zero restores the view before the entry is removed',()=>{
     const s=fixture();s.tick();s.paused=true;const m=s.api.getSettings();
     m.edit('offsetX',50);m.edit('offsetY',-20);m.apply(()=>true);s.tick();assert.equal(s.offsetWrites.length,0);
     assert.equal(s.api.refreshCameraPreview({}),true);assert.equal(s.offsetWrites[0].blend,0);
     m.edit('offsetX',0);m.edit('offsetY',0);m.apply(()=>true);assert.equal(s.api.refreshCameraPreview({}),true);
-    assert.deepEqual(s.removed,['PBZCamera.Framing']);
-    s.tick();assert.equal(s.removed.length,1);assert.equal(s.offsetWrites.length,1);
+    // Paused components do not tick their camera stack, so the visual is carried by a
+    // zero additive write and the entry itself is dropped on the next unpaused pass.
+    assert.deepEqual(s.removed,[]);assert.equal(s.offsetWrites.length,2);
+    assert.equal(s.offsetWrites[1].name,'PBZCamera.Framing');assert.equal(s.offsetWrites[1].value.Y,0);assert.equal(s.offsetWrites[1].value.Z,0);
+    s.paused=false;s.tick();assert.deepEqual(s.removed,['PBZCamera.Framing']);
+    s.tick();assert.equal(s.removed.length,1);assert.equal(s.offsetWrites.length,2);
 });
 
 test('framing is released on a foreign view and excluded contexts never receive new offset writes',()=>{
@@ -97,14 +101,17 @@ test('failed paused view refresh preserves saved settings and can be retried',()
     assert.equal(s.api.refreshCameraPreview({}),true);assert.equal(s.previewCalls.at(-1),'recovered');
 });
 
-test('paused original preset removes owned overrides immediately and refreshes exactly once',()=>{
+test('paused original preset restores the view at once and drops the entries on the next unpaused pass',()=>{
     const s=fixture();s.tick();s.paused=true;const model=s.api.getSettings();
     model.edit('distance',2);model.edit('fov',40);model.apply(()=>true);s.api.refreshCameraPreview({});
     model.preset('original');model.apply(()=>true);s.previewCalls.length=0;
     assert.equal(s.api.refreshCameraPreview({}),true);
-    assert.deepEqual(s.removed,['PBZCamera.Distance']);
+    assert.deepEqual(s.removed,[]);assert.equal(s.writes.at(-1).name,'PBZCamera.Distance');
+    assert.equal(s.writes.at(-1).value,0);assert.equal(s.writes.at(-1).blend,0);
     assert.equal(s.mode.CameraModeSettings.FOVSettings.CameraFOV,90);assert.equal(s.manager.CameraShakeScale,1);
     assert.deepEqual(s.previewCalls,['flush','fov','view']);
+    s.paused=false;s.tick();assert.deepEqual(s.removed,['PBZCamera.Distance']);
+    s.tick();assert.equal(s.removed.length,1);assert.equal(s.writes.length,3);
 });
 test('a foreign cinematic view releases only owned camera changes',()=>{
     const s=fixture();s.tick();s.foreign=true;s.tick();

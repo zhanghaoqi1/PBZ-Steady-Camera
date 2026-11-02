@@ -89,14 +89,27 @@ class CameraRuntime{
             const base=mode.CameraModeSettings.LocationSettings.DefaultCameraDistance;
             if(!Number.isFinite(base) || base<=0)throw Error('Invalid native distance baseline');
             const blend=paused?0:0.2;
-            if(active.distance===1){if(this.added)camera.RemoveOverrideParameter('PBZCamera.Distance',blend);this.added=false;}
+            if(active.distance===1){
+                if(this.added){
+                    // A paused component does not tick its camera stack, so a queued
+                    // removal is not rendered until play resumes. Drive the visual back
+                    // with a zero additive write now, and let the next unpaused pass
+                    // that removes the entry clean it up.
+                    if(paused){if(this.distanceDelta!==0){camera.SetAdditiveParameter_Distance('PBZCamera.Distance',0,blend);this.distanceDelta=0;}}
+                    else{camera.RemoveOverrideParameter('PBZCamera.Distance',blend);this.added=false;}
+                }
+            }
             else {
                 const delta=base*(active.distance-1);
                 if(!this.added || this.distanceDelta!==delta){camera.SetAdditiveParameter_Distance('PBZCamera.Distance',delta,blend);this.distanceDelta=delta;this.added=true;}
             }
             if(active.offsetX===0 && active.offsetY===0){
-                if(this.offsetAdded)camera.RemoveOverrideParameter('PBZCamera.Framing',blend);
-                this.offsetAdded=false;
+                if(this.offsetAdded){
+                    // Same paused-tick caveat as the distance override: write a zero
+                    // socket offset for the preview frame, then remove the entry later.
+                    if(paused){if(this.offsetX!==0 || this.offsetY!==0){camera.SetAdditiveParameter_SocketOffset('PBZCamera.Framing',new UE.Vector(0,0,0),blend);this.offsetX=0;this.offsetY=0;}}
+                    else{camera.RemoveOverrideParameter('PBZCamera.Framing',blend);this.offsetAdded=false;}
+                }
             }else if(!this.offsetAdded || this.offsetX!==active.offsetX || this.offsetY!==active.offsetY){
                 // UI X/Y are screen-horizontal/vertical. Native socket offsets
                 // use camera-local Y/Z; leave forward X and the native baseline intact.
