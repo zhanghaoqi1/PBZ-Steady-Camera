@@ -1,6 +1,6 @@
 {
   "name": "PBZ Steady Camera / 影之刃零稳镜设置",
-  "version": "0.1.0-beta",
+  "version": "0.1.2-beta",
   "pak_name": "zz_PBZCamera_P",
   "game": {
     "platform": "Windows x64 / Steam",

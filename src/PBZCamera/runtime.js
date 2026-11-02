@@ -34,9 +34,9 @@ function persist(text){return UE.EasyCsv.SaveStringToFileWithFullPath(text,confi
 // Whitelist gameplay camera modes. Unknown, execution and cinematic modes receive no writes.
 const gameplayMode=/^DA_CameraMode_(GroupCombat|Combat|Normal|Default|ShouderDefault|Walk|Run|Sprint)$/;
 class CameraRuntime{
-    constructor(world){this.world=world;this.camera=null;this.mode=null;this.manager=null;this.fov=null;this.shake=null;this.added=false;this.errorLogged=false;}
-    // Paused gameplay must not receive camera writes; keep the current overrides
-    // instead of releasing them so the settings survive the pause menu.
+    constructor(world){this.world=world;this.camera=null;this.mode=null;this.manager=null;this.fov=null;this.shake=null;this.added=false;this.offsetAdded=false;this.errorLogged=false;}
+    // Ordinary paused polling preserves ownership without writing. Only an
+    // explicit successful menu Apply requests a guarded camera-only refresh.
     isPaused(){
         try{return UE.GameplayStatics.IsGamePaused(this.world)===true;}
         catch(error){return false;}
@@ -44,19 +44,22 @@ class CameraRuntime{
     release(){
         const attempt=callback=>{try{callback();}catch(error){log('Camera teardown: '+String(error));}};
         attempt(()=>{if(this.added && valid(this.camera))this.camera.RemoveOverrideParameter('PBZCamera.Distance',0.2);});
+        attempt(()=>{if(this.offsetAdded && valid(this.camera))this.camera.RemoveOverrideParameter('PBZCamera.Framing',0.2);});
         this.added=false;
+        this.offsetAdded=false;
         attempt(()=>{if(this.fov)this.fov.release();});
         attempt(()=>{if(this.shake)this.shake.release();});
         this.fov=null;this.shake=null;this.camera=null;this.mode=null;this.manager=null;
         this.lastSettings=null;
     }
-    update(){
+    update(preview=false){
         try{
             const pawn=UE.GameplayStatics.GetPlayerPawn(this.world,0);
             const manager=UE.GameplayStatics.GetPlayerCameraManager(this.world,0);
             const sequence=TsHelper.getWorldSubsystem(this.world,UE.PBZLevelSequenceManager.StaticClass());
             if(!valid(pawn) || !valid(manager) || sequence && sequence.IsInSequence()){this.release();return;}
-            if(this.isPaused())return;
+            const paused=this.isPaused();
+            if(paused && !preview)return;
             const asc=UE.AbilitySystemBlueprintLibrary.GetAbilitySystemComponent(pawn);
             if(asc && asc.HasMatchingGameplayTag(TsHelper.constructGameplayTag('CharacterState.Dead'))){this.release();return;}
             // Native return is CineCameraComponent; the gameplay controller is a separate pawn component.
@@ -85,27 +88,56 @@ class CameraRuntime{
             const active=getSettings().active();
             const base=mode.CameraModeSettings.LocationSettings.DefaultCameraDistance;
             if(!Number.isFinite(base) || base<=0)throw Error('Invalid native distance baseline');
-            if(active.distance===1){if(this.added)camera.RemoveOverrideParameter('PBZCamera.Distance',0.2);this.added=false;}
+            const blend=paused?0:0.2;
+            if(active.distance===1){if(this.added)camera.RemoveOverrideParameter('PBZCamera.Distance',blend);this.added=false;}
             else {
                 const delta=base*(active.distance-1);
-                if(!this.added || this.distanceDelta!==delta){camera.SetAdditiveParameter_Distance('PBZCamera.Distance',delta,0.2);this.distanceDelta=delta;this.added=true;}
+                if(!this.added || this.distanceDelta!==delta){camera.SetAdditiveParameter_Distance('PBZCamera.Distance',delta,blend);this.distanceDelta=delta;this.added=true;}
+            }
+            if(active.offsetX===0 && active.offsetY===0){
+                if(this.offsetAdded)camera.RemoveOverrideParameter('PBZCamera.Framing',blend);
+                this.offsetAdded=false;
+            }else if(!this.offsetAdded || this.offsetX!==active.offsetX || this.offsetY!==active.offsetY){
+                // UI X/Y are screen-horizontal/vertical. Native socket offsets
+                // use camera-local Y/Z; leave forward X and the native baseline intact.
+                camera.SetAdditiveParameter_SocketOffset('PBZCamera.Framing',new UE.Vector(0,active.offsetX,active.offsetY),blend);
+                this.offsetX=active.offsetX;this.offsetY=active.offsetY;this.offsetAdded=true;
             }
             if(active.fov===0)this.fov.release();else this.fov.apply(base=>base+active.fov);
             if(active.shake===1)this.shake.release();else this.shake.apply(base=>base*active.shake);
             const signature=JSON.stringify(active);
             if(this.lastSettings!==signature){
                 log('Camera readback: '+JSON.stringify({mode:String(mode.GetName()),baseDistance:base,distanceDelta:this.added?this.distanceDelta:0,
-                    fov:mode.CameraModeSettings.FOVSettings.CameraFOV,shake:manager.CameraShakeScale}));
+                    fov:mode.CameraModeSettings.FOVSettings.CameraFOV,shake:manager.CameraShakeScale,
+                    framingOffset:{x:active.offsetX,y:active.offsetY}}));
                 this.lastSettings=signature;
             }
             // A completed pass proves the interfaces work again; one transient
             // native error must not disable the whole feature until reload.
             this.errorLogged=false;
+            if(preview && paused){
+                try{
+                    const controller=UE.GameplayStatics.GetPlayerController(this.world,0);
+                    const fovObject=camera.GetCameraFOVObject();
+                    if(!valid(controller) || !valid(fovObject))return false;
+                    // Flush the native camera state, then its FOV interpolation,
+                    // then the paused POV cache (same controller API as Appearance).
+                    camera.Flush();fovObject.FlushTargetFOV();controller.ForceUpdateCameraView();
+                    log('Camera paused preview refreshed');
+                }catch(error){log('Camera preview unavailable: '+String(error));return false;}
+            }
+            return true;
         }catch(error){
             if(!this.errorLogged){log('Camera suspended: '+String(error));this.errorLogged=true;}
             try{this.release();}catch(cleanup){log('Camera cleanup: '+String(cleanup));}
         }
     }
+}
+function refreshCameraPreview(context){
+    try{
+        const state=worlds.get(UE.GameplayStatics.GetGameMode(context));
+        return !!state && state.camera.update(true)===true;
+    }catch(error){log('Camera preview unavailable: '+String(error));return false;}
 }
 function start(world){
     if(worlds.has(world))return;
@@ -117,4 +149,4 @@ function stop(world){
     const state=worlds.get(world);if(!state)return;
     clearInterval(state.timer);worlds.delete(world);state.camera.release();log('World services stopped');
 }
-module.exports={getSettings,persist,start,stop,log,valid};
+module.exports={getSettings,persist,start,stop,log,valid,refreshCameraPreview};

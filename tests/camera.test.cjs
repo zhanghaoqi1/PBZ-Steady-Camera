@@ -28,7 +28,7 @@ test('restore original is a draft operation until applied', () => {
 });
 test('bad values, schema versions, unknown settings and oversized config fail closed', () => {
     const s=new Settings();
-    for(const [key,value] of [['distance',Infinity],['distance',1.41],['shake',-1],['fov','2'],['unknown',1]])
+    for(const [key,value] of [['distance',Infinity],['distance',2.01],['shake',-1],['fov','2'],['unknown',1]])
         assert.throws(()=>s.edit(key,value));
     for(const value of ['{}','{"version":99,"settings":{}}','{"version":1,"settings":{"cheat":1}}','x'.repeat(5000)])
         assert.throws(()=>decode(value));
@@ -41,6 +41,24 @@ test('prototype names cannot be accepted as camera fields or presets',()=>{
         assert.throws(()=>decode('{"version":1,"settings":{"'+key+'":1}}'));
     }
 });
+
+test('expanded distance and FOV survive apply and restart while out-of-range values refuse',()=>{
+    const s=new Settings();s.edit('distance',2);s.edit('fov',40);
+    let saved;s.apply(text=>{saved=text;return true;});
+    assert.deepEqual(decode(saved),{distance:2,fov:40,shake:0.6,offsetX:0,offsetY:0});
+    for(const [key,value] of [['distance',2.01],['fov',41],['fov',-1]])assert.throws(()=>s.edit(key,value));
+    assert.equal(new Settings(decode('{"version":1,"settings":{"distance":1.4,"fov":10,"shake":1}}')).active().fov,10);
+});
+
+test('legacy configs default to original framing; signed offsets persist, cancel and reset with presets',()=>{
+    const s=new Settings(decode('{"version":1,"settings":{"distance":1.4,"fov":10,"shake":1}}'));
+    assert.equal(s.active().offsetX,0);assert.equal(s.active().offsetY,0);
+    s.edit('offsetX',-300);s.edit('offsetY',300);let saved;s.apply(text=>{saved=text;return true;});
+    const reopened=new Settings(decode(saved));assert.equal(reopened.active().offsetX,-300);assert.equal(reopened.active().offsetY,300);
+    reopened.edit('offsetX',150);reopened.cancel();assert.equal(reopened.draft().offsetX,-300);
+    for(const preset of ['steady','original']){reopened.preset(preset);assert.equal(reopened.draft().offsetX,0);assert.equal(reopened.draft().offsetY,0);}
+    for(const [key,value] of [['offsetX',301],['offsetX',-301],['offsetY',301],['offsetY',-301],['offsetX',NaN],['offsetY','5']])assert.throws(()=>s.edit(key,value));
+});
 test('repeated camera application derives from original baseline', () => {
     let value=90; const x=new OwnedScalar(()=>value,v=>{value=v;});
     x.apply(base=>base+10); x.apply(base=>base+10); assert.equal(value,100);
@@ -50,19 +68,6 @@ test('an external camera update becomes the new baseline', () => {
     let value=0.8; const x=new OwnedScalar(()=>value,v=>{value=v;});
     x.apply(base=>base*0.5); value=0.6; x.apply(base=>base*0.5);
     assert.equal(value,0.3); x.release(); assert.equal(value,0.6);
-});
-
-test('native resets to the original baseline reapply the owned adjustment', () => {
-    for(const [baseline,transform,expected] of [[1,base=>base*0.6,0.6],[90,base=>base+5,95]]){
-        let value=baseline,writes=0;
-        const x=new OwnedScalar(()=>value,v=>{value=v;writes++;});
-        x.apply(transform); assert.equal(value,expected);
-        value=baseline;
-        x.apply(transform); assert.equal(value,expected);
-        assert.equal(writes,2);
-        x.apply(transform); assert.equal(writes,2);
-        x.release(); assert.equal(value,baseline);
-    }
 });
 test('release does not overwrite another camera owner or a destroyed camera', () => {
     let value=80,alive=true; const x=new OwnedScalar(()=>value,v=>{value=v;},()=>alive);

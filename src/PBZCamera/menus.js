@@ -2,7 +2,7 @@
 const UE=require('ue');
 const {$ref,$unref,makeUClass}=require('puerts');
 const {FText}=require('cpp');
-const {getSettings,persist,log,valid}=require('./runtime');
+const {getSettings,persist,log,valid,refreshCameraPreview}=require('./runtime');
 const {vignetteStrips}=require('./vignette');
 const pauseStates=new WeakMap();
 const cameraHint='调整后选择“应用”；返回会放弃未应用的修改。';
@@ -112,7 +112,9 @@ function makeCameraPage(host,buttonClass){
     root.AddChildToHorizontalBox(size(help,500)).SetPadding(new UE.Margin(180,95,0,0));
     add(box,nativeLabel('镜头设置',1,24));
     add(box,size(nativeLabel('战斗镜头',0.55,20),960,60));
-    const fields=[['distance','战斗镜头距离',0.9,1.4,0.05,v=>Math.round(v*100)+'%'],['fov','视野角增量',0,10,1,v=>v.toFixed(0)+'°'],['shake','战斗抖动幅度',0,1,0.1,v=>Math.round(v*100)+'%']];
+    const signed=v=>(v>0?'+':'')+v.toFixed(0);
+    const fields=[['distance','战斗镜头距离',0.9,2,0.05,v=>Math.round(v*100)+'%'],['fov','视野角增量',0,40,1,v=>v.toFixed(0)+'°'],['shake','战斗抖动幅度',0,1,0.1,v=>Math.round(v*100)+'%'],
+        ['offsetX','镜头水平偏移（X）',-300,300,5,signed],['offsetY','镜头垂直偏移（Y）',-300,300,5,signed]];
     for(const [key,title,min,max,step,format] of fields){
         const row=make(UE.HorizontalBox);add(box,size(row,960,64));
         horizontal(row,size(nativeLabel(title),520));
@@ -169,17 +171,24 @@ function makeCameraPage(host,buttonClass){
     action(presets,'稳镜预设',()=>{model.preset('steady');state.refresh();state.notice.SetText(text('尚未应用'));});
     action(presets,'恢复原版',()=>{model.preset('original');state.refresh();state.notice.SetText(text('尚未应用'));});
     action(commands,'应用',()=>{
-        try{model.apply(persist);state.notice.SetText(text('已应用并保存'));log('Camera settings applied '+JSON.stringify(model.active()));}
+        try{
+            model.apply(persist);
+            const previewed=refreshCameraPreview(host);
+            state.notice.SetText(text(previewed?'已应用并保存，可在背景查看镜头变化':'已保存；当前镜头暂不支持菜单预览'));
+            log('Camera settings applied '+JSON.stringify(model.active()));
+        }
         catch(error){state.notice.SetText(text('保存失败，设置未应用'));log('Camera save failed: '+String(error));}
     });
     action(commands,'取消',()=>{model.cancel();state.refresh();state.notice.SetText(text('已取消本次修改'));});
     state.notice=add(box,nativeLabel(cameraHint,0.65,20));
     for(const [title,description] of [
-        ['战斗镜头距离','拉远镜头，扩大周边视野。每次调整 5%，范围为原版的 90% 至 140%。'],
-        ['视野角增量','在原版视野角上增加 0° 至 10°，每次调整 1°。'],
-        ['战斗抖动幅度','降低战斗中的镜头抖动。每次调整 10%；0% 关闭抖动，100% 保持原版。']]){
+        ['战斗镜头距离','原版的 90% 至 200%，每档 5%。应用后在背景预览。'],
+        ['视野角增量','原版基础上增加 0° 至 40°，每档 1°。应用后立即预览。'],
+        ['战斗抖动幅度','每档 10%。0% 关闭战斗抖动，100% 保持原版。'],
+        ['水平偏移 X','范围 -300 至 +300 cm，每档 5 cm。负值让人物向画面右侧移动，正值向左侧；0 为原版。'],
+        ['垂直偏移 Y','范围 -300 至 +300 cm，每档 5 cm。正值抬高镜头，人物向下移动；0 为原版。']]){
         add(help,nativeLabel(title));const body=nativeLabel(description,0.65,20);body.SetAutoWrapText(true);add(help,body);
-        add(help,size(nativeLabel(''),400,26));
+        add(help,size(nativeLabel(''),400,12));
     }
     for(let i=0;i<state.controls.length;i++){
         const c=state.controls[i];

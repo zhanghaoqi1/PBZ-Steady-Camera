@@ -1,9 +1,9 @@
 "use strict";
 const presets=Object.freeze({
-    original:Object.freeze({distance:1,fov:0,shake:1}),
-    steady:Object.freeze({distance:1.1,fov:0,shake:0.6})
+    original:Object.freeze({distance:1,fov:0,shake:1,offsetX:0,offsetY:0}),
+    steady:Object.freeze({distance:1.1,fov:0,shake:0.6,offsetX:0,offsetY:0})
 });
-const bounds={distance:[0.9,1.4],fov:[0,10],shake:[0,1]};
+const bounds={distance:[0.9,2],fov:[0,40],shake:[0,1],offsetX:[-300,300],offsetY:[-300,300]};
 function validate(settings) {
     if(!settings || typeof settings!=='object' || Array.isArray(settings)) throw Error('Invalid settings');
     const result={...presets.steady};

@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const {Settings}=require('../src/PBZCamera/camera-settings');
 function signal(){const set=new Set();return {Add:f=>set.add(f),Remove:f=>set.delete(f),emit:v=>{for(const f of set)f(v);},count:()=>set.size};}
 function fixture(){
-    const s={settings:new Settings(),backCount:0,sliders:[],buttons:[],texts:[],tabs:new Map(),saved:[],ids:['System'],descriptors:[],pages:[{}],indices:new Map([['System',0]])};
+    const s={settings:new Settings(),backCount:0,previewed:[],previewOk:true,saveOk:true,sliders:[],buttons:[],texts:[],tabs:new Map(),saved:[],ids:['System'],descriptors:[],pages:[{}],indices:new Map([['System',0]])};
     function widget(){return {SetNavigationRuleExplicit(){},SetUserFocus(){},RemoveFromParent(){},SetDesiredFocusWidget(){},SetRenderOpacity(){}};}
     function button(){const b={...widget(),selectable:true,selectOnFocus:true,bSetSelectedOnHover:true,selected:false,GetSelected(){return this.selected;},Text:{SetPBZFormatText(t){this.text=t;},SetColorAndOpacity(v){this.color=v;},SetRenderOpacity(){}},
         OnButtonBaseClicked:signal(),SetButtonText(t){this.text=t;},SetWidthOverride(){},SetIsSelectable(v){this.selectable=v;},SetShouldSelectUponReceivingFocus(v){this.selectOnFocus=v;},SetIsSelected(v){this.selected=v;},
@@ -36,7 +36,7 @@ function fixture(){
     const deps={'ue':UE,'puerts':{$ref:v=>({value:v}),$unref:r=>r.value,makeUClass:cls=>{
         if(cls.hasOwnProperty('StaticClass'))throw Error('must inherit StaticClass');return cls;
     }},'cpp':{FText:{FromString:v=>v}},
-        './runtime':{getSettings:()=>s.settings,persist:t=>{s.saved.push(t);return true;},valid:o=>!!o,log(){}},
+        './runtime':{getSettings:()=>s.settings,persist:t=>{s.saved.push(t);return s.saveOk;},refreshCameraPreview:host=>{s.previewed.push({host,active:s.settings.active()});return s.previewOk;},valid:o=>!!o,log(){}},
         './vignette':require('../src/PBZCamera/vignette')};
     const module={exports:{}};vm.runInNewContext(fs.readFileSync(require.resolve('../src/PBZCamera/menus'),'utf8'),{require:n=>deps[n],module});
     s.api=module.exports;s.api.attachPause(s.host);return s;
@@ -50,7 +50,7 @@ test('closing removes page delegates; a pooled host can reopen with one binding 
     const s=fixture();const slider=s.sliders[0];
     s.api.detachPause(s.host);assert.equal(slider.OnValueChanged.count(),0);
     slider.OnValueChanged.emit(1.4);assert.equal(s.settings.draft().distance,1.1);
-    s.api.attachPause(s.host);assert.equal(s.sliders.length,3);assert.equal(s.tabs.size,1);
+    s.api.attachPause(s.host);assert.equal(s.sliders.length,5);assert.equal(s.tabs.size,1);
     assert.equal(slider.OnValueChanged.count(),1);slider.OnValueChanged.emit(1.2);assert.equal(s.settings.draft().distance,1.2);
     s.api.detachPause(s.host);s.api.detachPause(s.host);assert.equal(slider.OnValueChanged.count(),0);
 });
@@ -74,12 +74,39 @@ test('camera tab sets visible text on the native localized text child',()=>{
 
 test('step buttons use the field increment, clamp bounds, and only edit the draft',()=>{
     const s=fixture();const steps=s.buttons.filter(b=>b.OnClicked);
-    assert.equal(steps.length,6);
+    assert.equal(steps.length,10);
     steps[1].OnClicked.emit();assert.equal(s.settings.draft().distance,1.15);
     for(let i=0;i<30;i++)steps[0].OnClicked.emit();assert.equal(s.settings.draft().distance,0.9);
-    for(let i=0;i<30;i++)steps[3].OnClicked.emit();assert.equal(s.settings.draft().fov,10);
+    for(let i=0;i<50;i++)steps[3].OnClicked.emit();assert.equal(s.settings.draft().fov,40);
     steps[4].OnClicked.emit();assert.equal(s.settings.draft().shake,0.5);
     assert.equal(s.saved.length,0);assert.equal(s.settings.active().distance,1.1);
+});
+
+test('signed framing arrows edit five-centimetre drafts, clamp both directions and only preview after Apply',()=>{
+    const s=fixture();assert.equal(s.sliders.length,5);const steps=s.buttons.filter(b=>b.OnClicked);
+    steps[6].OnClicked.emit();assert.equal(s.settings.draft().offsetX,-5);assert.equal(s.settings.active().offsetX,0);
+    steps[9].OnClicked.emit();assert.equal(s.settings.draft().offsetY,5);assert.equal(s.previewed.length,0);
+    for(let i=0;i<70;i++)steps[6].OnClicked.emit();assert.equal(s.settings.draft().offsetX,-300);
+    for(let i=0;i<130;i++)steps[7].OnClicked.emit();assert.equal(s.settings.draft().offsetX,300);
+    for(let i=0;i<130;i++)steps[8].OnClicked.emit();assert.equal(s.settings.draft().offsetY,-300);
+    s.buttons.find(b=>b.text==='应用').click();assert.equal(s.previewed[0].active.offsetX,300);assert.equal(s.previewed[0].active.offsetY,-300);
+    s.sliders[3].OnValueChanged.emit(-50);s.buttons.find(b=>b.text==='取消').click();assert.equal(s.settings.draft().offsetX,300);
+});
+
+test('Apply previews only persisted values and reports unavailable preview separately from save failure',()=>{
+    const s=fixture();s.sliders[1].OnValueChanged.emit(30);
+    assert.equal(s.previewed.length,0);
+    s.buttons.find(b=>b.text==='应用').click();
+    assert.equal(s.previewed.length,1);assert.equal(s.previewed[0].host,s.host);assert.equal(s.previewed[0].active.fov,30);
+    s.previewOk=false;s.sliders[1].OnValueChanged.emit(35);s.buttons.find(b=>b.text==='应用').click();
+    assert.equal(s.settings.active().fov,35);assert.ok(s.texts.some(t=>String(t.text).includes('已保存')&&String(t.text).includes('预览')));
+});
+
+test('failed persistence never previews or changes active settings and keeps the edited draft',()=>{
+    const s=fixture();s.saveOk=false;s.sliders[1].OnValueChanged.emit(30);
+    s.buttons.find(b=>b.text==='应用').click();
+    assert.equal(s.previewed.length,0);assert.equal(s.settings.active().fov,0);assert.equal(s.settings.draft().fov,30);
+    assert.ok(s.texts.some(t=>String(t.text).includes('保存失败')));
 });
 
 test('native BackInput cancels unapplied edits and delegates to the original page pop',()=>{
