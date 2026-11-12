@@ -10,11 +10,10 @@ PBZ Steady Camera · **v0.2.0-beta — UE4SS 重制版**
 
 ## 当前功能
 
-- 原生顶部“镜头”标签位于“系统”右侧，可通过 Q/E 导航；选中时黑色字体。
+- 原生顶部“镜头”标签位于“系统”右侧
 - 五项滑条：距离90%–200%、视野增量0–40°、抖动0%–100%、水平/垂直偏移±300cm。
 - 拖动实时预览，停止调节或返回时自动保存，重启保留上次设置。
 - “重置为原版”立即恢复并保存距离100%、视野增量0、抖动100%、偏移0/0。
-- Esc返回游戏；同一角色相机的移动模式交接保留距离和构图补偿，避免清零重加。
 
 ## 安装
 
@@ -22,7 +21,6 @@ PBZ Steady Camera · **v0.2.0-beta — UE4SS 重制版**
 2. 移除旧PAK版的 `zz_PBZCamera_P.pak/.utoc/.ucas`。旧组合版 `zz_PBZCombat_P` 也不能同时使用。
 3. 解压ZIP中的 `PBZSteadyCamera` 到当前UE4SS的 `Mods` 目录。
 4. 确认 `ue4ss/Mods/PBZSteadyCamera/Scripts/main.lua` 与 `enabled.txt` 存在。实测Steam位置为 `PBZ/platform/steam/ue4ss/Mods/`。
-5. 正常通过Steam启动，在Esc菜单选择“系统”右侧“镜头”。
 
 配置文件为 `%LOCALAPPDATA%/ProjectPBZ/Saved/PBZCamera.json`，旧配置保留；发行包不附带任何玩家配置。卸载仅删除本Mod文件夹，保留UE4SS和其他Mod。
 
