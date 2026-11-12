@@ -1,3 +1,5 @@
+> Legacy PAK build instructions for v0.1.x only. The current v0.2.0-beta uses UE4SS Lua files shipped in the release ZIP; it does not use this builder. See README and docs/README_EN.md.
+
 # Rebuilding the camera-only source package
 
 This source archive contains only the Mod's own six modules, tests and builder. It does not include game originals, decryption keys, game executables, UE4SS or packaging tool binaries.

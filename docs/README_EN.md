@@ -1,49 +1,39 @@
-﻿# Phantom Blade Zero 鈥?Steady Camera v0.1.2-beta
+# PBZ Steady Camera v0.2.0-beta — UE4SS rewrite
 
-Camera-only experimental build. Adds a native **Camera Settings / 闀滃ご璁剧疆** tab to the Esc menu, with distance, FOV offset, camera-shake and camera-offset controls, Apply/Cancel and presets. The current UI labels are in Simplified Chinese.
+Camera-only mod for Phantom Blade Zero, Windows x64 / Steam. Tested game build: CL 302256-17280, UE 5.7. This is a beta with unresolved intermittent native crashes.
 
-## Supported base build
+## Requirement
 
-Windows x64 / Steam Build **26266538**, game **CL-301524_JKS-17219**, Unreal Engine **5.7.4**. Other builds/platforms and future game updates are unverified.
+Install a UE4SS build compatible with your PBZ version separately. Development and live UI checks used the PBZ-adapted UE4SS r4 build with `LoopInGameThreadWithDelay`. Generic UE4SS builds and other game versions have not been verified. **This archive does not include UE4SS, any loader DLL, or any other mod.**
 
-The separated package passes automated behavior/dependency tests and a PAK unpack/hash roundtrip. The shared camera implementation and native menu were previously tested in-game in the combined development build. **A new end-to-end installation/gameplay test of this separated distribution has not been performed.** This is a beta, not a claim of full gameplay coverage.
+## Install / upgrade from v0.1.x
 
-This release expands distance/FOV/offset ranges and adds paused Apply preview. The shared combined development build received real-game preview, original-preset and Esc-cancellation checks on 2026-11-02. This is not a fresh standalone installation test.
+1. Fully close the game. Install and verify your compatible UE4SS loader first.
+2. If upgrading from the PAK edition, remove only the old `zz_PBZCamera_P.pak`, `zz_PBZCamera_P.utoc` and `zz_PBZCamera_P.ucas` from `ProjectPBZ/Content/Paks/~mods`. Do not run both camera editions together. The old combined `zz_PBZCombat_P` edition also contains camera edits and must not be used alongside this mod.
+3. Extract the `PBZSteadyCamera` folder into the active UE4SS `Mods` directory, alongside your other mod folders. On the tested Steam layout this is `PBZ/platform/steam/ue4ss/Mods/`.
+4. Verify the final path is `ue4ss/Mods/PBZSteadyCamera/Scripts/main.lua`, and `ue4ss/Mods/PBZSteadyCamera/enabled.txt` exists. Do not create an extra nested `PBZSteadyCamera` directory.
+5. Start through Steam. Open the Esc system menu and select the camera tab immediately to the right of System. The current in-game labels are Simplified Chinese. Q/E includes the camera tab.
 
-## Installation
-
-1. Exit the game completely.
-2. Remove the old combined development package if present: all three `zz_PBZCombat_P.pak/.utoc/.ucas` files. Do not install both packages together.
-3. Copy this archive's `ProjectPBZ` folder into the game's root folder, creating:
-
-```text
-PBZ/ProjectPBZ/Content/Paks/~mods/zz_PBZCamera_P.pak
-PBZ/ProjectPBZ/Content/Paks/~mods/zz_PBZCamera_P.utoc
-PBZ/ProjectPBZ/Content/Paks/~mods/zz_PBZCamera_P.ucas
-```
-
-Keep all three files. Do not place them under `platform/steam` or replace original containers. Launch normally through Steam, load a save, press Esc and select the rightmost camera tab.
-
-Uses the game's bundled Puerts runtime. No additional UE4SS, ModEngine, injected DLL, launcher or online service is required by this package.
+If this mod folder already exists, back up that folder and replace its contents with this release. No loader files need to be replaced.
 
 ## Controls
 
-Distance: **90鈥?00%**, steps of **5%**, default **110%**. FOV offset: **+0掳 to +40掳**, steps of **1掳**, default **+0掳**. Shake: **0鈥?00%**, steps of **10%**, default **60%**. Horizontal camera offset (X): **-300 to +300 cm**, steps of **5 cm**, default **0**. Vertical camera offset (Y): **-300 to +300 cm**, steps of **5 cm**, default **0**.
+Five sliders adjust distance (90–200%, step 5%), FOV addition (0–40 degrees, step 1), shake (0–100%, step 5%), horizontal and vertical camera offsets (-300 to +300 cm, step 5 cm). Sliders preview immediately; values save after input settles and on leaving the page. Esc returns to gameplay.
 
-Edit using sliders/arrows and choose **搴旂敤 (Apply)** to save; the paused menu background refreshes immediately without leaving the page. The native blur and vignette remain. **鍙栨秷 (Cancel)**, switching tabs or Esc discards unapplied edits. **鎭㈠鍘熺増 (Original preset)** prepares 100% distance, +0掳 FOV, 100% shake and zero offsets; Apply is still required.
+The reset button `重置为原版` immediately restores and saves distance 100%, FOV addition 0, shake 100% and offsets 0/0. New installations use these original values. There are no preset/apply/cancel buttons in this rewrite.
 
-Offsets are in centimetres: negative X shifts the character to the right of frame (camera moves left), positive Y raises the camera and moves the character down; 0 is the original framing. Large offsets (near 卤300 cm) may push the camera through doorways, walls or ceilings, as the original camera does no collision correction for them.
+Settings persist at `%LOCALAPPDATA%/ProjectPBZ/Saved/PBZCamera.json`. An existing profile is retained, including one created by the previous edition; this package contains no player configuration. Horizontal positive offsets move the camera to the right; positive vertical offsets raise it. Large offsets can put the camera inside geometry.
 
-Configuration: `%LOCALAPPDATA%\ProjectPBZ\Saved\PBZCamera.json`. No personal configuration or save is bundled. Old combined-package settings are not imported automatically.
+## Known issues and validation
 
-Only recognized ordinary gameplay cameras are modified. Unknown/cinematic/execution cameras are left alone. Full controller navigation, ultrawide layouts, every scene and every Boss encounter have not been comprehensively validated.
+- Intermittent native access-violation crashes remain under investigation. Two development-session dumps faulted in UE4SS.dll at different locations and on different threads; the triggering mod/call is not established. This release does **not** claim to fix those crashes.
+- Movement-mode handoffs now preserve distance/framing additive channels rather than zeroing and re-adding them during normal/run/sprint transitions. The regression passes; sustained sprint visuals still need broader in-game validation.
+- Native tab placement, Q/E and mouse dragging, reset, Esc return, saved-profile reload and selected black label have local/user live evidence. The relocated release package is verified offline; a complete fresh player installation has not been live-tested.
+- Controller coverage, ultrawide layouts, all maps and all mod combinations have not been fully validated. Other mods changing the same camera or system menu may conflict.
 
-## Conflicts and uninstall
+Logs use the normal UE4SS log with `[PBZSteadyCamera]` prefixes. If menu construction was interrupted and the camera page is disabled on the next launch, close the game, retain the logs, then remove only `PBZSteadyCamera/Scripts/page.mounting` to retry. This file is a mod-owned crash guard, not a game save.
 
-Overrides `UI/Widget/SystemBase.js` and `Gameplay/GameModeBuild.js`; adds six camera modules. Other mods replacing these scripts or changing the same camera may conflict. Remove older versions before installing this one.
+To uninstall, close the game and remove only `ue4ss/Mods/PBZSteadyCamera`. Keep UE4SS and other mods. The separate settings file remains unless you choose to remove it.
 
-To uninstall, exit the game and delete only the three `zz_PBZCamera_P` files. To reset this mod's defaults, optionally delete `PBZCamera.json` while the game is closed. Its optional diagnostic log is `PBZCamera-diagnostics.txt` in the same Saved directory.
-
-No Boss rematch, combat-stat/AI edits, developer request execution, resource keys, personal saves, external binaries, networking, updater or telemetry are included. See `MANIFEST.json` and `SHA256SUMS.txt` for the exact payload, hashes and validation scope.
-
-Version 0.1.3 fixes a defect where applying `Restore original` appeared to do nothing until a slider was moved again: distance and XY framing are native additive overrides, and a paused camera component does not tick, so removing an override did not recompute the paused image. The combined development build was re-tested in game on 2026-11-02 and now returns distance, FOV, shake and both offsets to the original look immediately; the standalone package runs the same code and passes the automated suite.
+Project: https://github.com/zhanghaoqi1/PBZ-Steady-Camera
+Nexus: https://www.nexusmods.com/phantombladezero/mods/382
